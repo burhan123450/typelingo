@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { LANGUAGES_LIST } from "@/lib/languages";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://typelingo.com";
+  const baseUrl = "https://bigbirdcuration.com";
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [

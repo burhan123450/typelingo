@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://typelingo.com/sitemap.xml",
+    sitemap: "https://bigbirdcuration.com/sitemap.xml",
   };
 }

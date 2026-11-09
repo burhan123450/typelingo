@@ -73,13 +73,17 @@ export default function TypingBox({
   const [timeLeft, setTimeLeft] = useState<number>(durationForMode(mode));
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
-  // Metrics tracking refs
+  // Real wall-clock refs so typing does not reset or slow down the timer
+  const startTimeMsRef = useRef<number | null>(null);
+  const typedTextRef = useRef<string>("");
+  const targetTextRef = useRef<string>("");
   const totalTypedRef = useRef<number>(0);
   const errorMapRef = useRef<Record<string, number>>({});
   const wpmSamplesRef = useRef<number[]>([]);
   const isComposingRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const savedResultRef = useRef<boolean>(false);
+  const activeCharRef = useRef<HTMLSpanElement | null>(null);
 
   const initTest = useCallback(
     (selectedMode = mode, selectedLang = activeLang, selectedContent = contentType) => {
@@ -88,19 +92,25 @@ export default function TypingBox({
         lessonId,
         weakKeysMap: weakMap,
         contentType: selectedContent,
-      });
-      setTargetText(text.normalize("NFC"));
+      }).normalize("NFC");
+
+      setTargetText(text);
+      targetTextRef.current = text;
       setTypedText("");
+      typedTextRef.current = "";
       setIsRunning(false);
       setIsFinished(false);
       setHasCurrentError(false);
+
       const dur = durationForMode(selectedMode);
       setTimeLeft(dur);
       setElapsedSeconds(0);
+      startTimeMsRef.current = null;
       totalTypedRef.current = 0;
       errorMapRef.current = {};
       wpmSamplesRef.current = [];
       savedResultRef.current = false;
+
       setTimeout(() => {
         inputRef.current?.focus();
       }, 30);
@@ -131,14 +141,15 @@ export default function TypingBox({
 
   // Complete test & persist result
   const finishTest = useCallback(
-    (finalTyped: string, finalElapsed: number) => {
+    (finalTyped: string, finalElapsedSeconds: number) => {
       if (savedResultRef.current) return;
       savedResultRef.current = true;
       setIsRunning(false);
       setIsFinished(true);
 
-      const effectiveElapsed = Math.max(1, finalElapsed);
-      const correctChars = countCorrectChars(finalTyped, targetText);
+      const effectiveElapsed = Math.max(1, finalElapsedSeconds);
+      const currentTarget = targetTextRef.current;
+      const correctChars = countCorrectChars(finalTyped, currentTarget);
       const totalTyped = Math.max(correctChars, totalTypedRef.current);
       const wpm = calculateWPM(correctChars, effectiveElapsed);
       const accuracy = calculateAccuracy(correctChars, totalTyped);
@@ -153,7 +164,7 @@ export default function TypingBox({
         languageId: activeLang.id,
         mode,
         lessonId,
-        durationSeconds: effectiveElapsed,
+        durationSeconds: Math.round(effectiveElapsed),
         wpm,
         accuracy,
         consistency,
@@ -167,57 +178,84 @@ export default function TypingBox({
         onLessonComplete(result);
       }
     },
-    [activeLang.id, countCorrectChars, lessonId, mode, onLessonComplete, recordTestResult, targetText]
+    [activeLang.id, countCorrectChars, lessonId, mode, onLessonComplete, recordTestResult]
   );
 
-  // Timer interval
+  // Exact wall-clock timer (does NOT depend on typedText, so typing never resets the 1s interval!)
   useEffect(() => {
     if (!isRunning || isFinished) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds((prev) => {
-        const nextElapsed = prev + 1;
-        const correctNow = countCorrectChars(typedText, targetText);
-        const currentWpm = calculateWPM(correctNow, nextElapsed);
-        wpmSamplesRef.current.push(currentWpm);
-        return nextElapsed;
-      });
 
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          finishTest(typedText, durationForMode(mode));
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const totalDuration = durationForMode(mode);
+    let lastSampleSecond = 0;
+
+    const interval = setInterval(() => {
+      if (!startTimeMsRef.current) return;
+      const exactElapsed = (Date.now() - startTimeMsRef.current) / 1000;
+      const remaining = Math.max(0, Math.ceil(totalDuration - exactElapsed));
+
+      setElapsedSeconds(exactElapsed);
+      setTimeLeft(remaining);
+
+      const wholeSecond = Math.floor(exactElapsed);
+      if (wholeSecond > lastSampleSecond && wholeSecond >= 1) {
+        lastSampleSecond = wholeSecond;
+        const correctNow = countCorrectChars(
+          typedTextRef.current,
+          targetTextRef.current
+        );
+        const sampleWpm = calculateWPM(correctNow, exactElapsed);
+        wpmSamplesRef.current.push(sampleWpm);
+      }
+
+      if (exactElapsed >= totalDuration) {
+        clearInterval(interval);
+        finishTest(typedTextRef.current, totalDuration);
+      }
+    }, 200);
 
     return () => clearInterval(interval);
-  }, [isRunning, isFinished, typedText, targetText, mode, countCorrectChars, finishTest]);
+  }, [isRunning, isFinished, mode, countCorrectChars, finishTest]);
+
+  // Keep active character scrolled into view as endless words are added
+  useEffect(() => {
+    if (activeCharRef.current) {
+      activeCharRef.current.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+  }, [typedText.length]);
 
   // Process newly typed string (handles standard keys + RTL IME composition)
   // Blocks advancing until the user types the exact expected character
+  // And endlessly appends new words/sentences if the timer is still running!
   const applyNewTypedValue = (rawNewVal: string) => {
     if (isFinished) return;
     const normalized = rawNewVal.normalize("NFC");
 
     if (!isRunning && normalized.length > 0) {
+      startTimeMsRef.current = Date.now();
       setIsRunning(true);
     }
 
+    const currentTyped = typedTextRef.current;
+    let currentTarget = targetTextRef.current;
+
     // Allow backspace if user wants to step back
-    if (normalized.length < typedText.length) {
+    if (normalized.length < currentTyped.length) {
+      typedTextRef.current = normalized;
       setTypedText(normalized);
       setHasCurrentError(false);
       return;
     }
 
     // Check newly typed character(s) one by one; only advance on exact match
-    let accepted = typedText;
+    let accepted = currentTyped;
     let hitWrongKey = false;
 
-    for (let i = typedText.length; i < normalized.length; i++) {
+    for (let i = currentTyped.length; i < normalized.length; i++) {
       const typedChar = normalized[i];
-      const expectedChar = targetText[accepted.length];
+      const expectedChar = currentTarget[accepted.length];
       if (!expectedChar) break;
 
       totalTypedRef.current += 1;
@@ -233,12 +271,22 @@ export default function TypingBox({
       }
     }
 
-    setHasCurrentError(hitWrongKey);
-    setTypedText(accepted);
-
-    if (accepted.length >= targetText.length && targetText.length > 0) {
-      finishTest(accepted, Math.max(1, elapsedSeconds));
+    // Infinite words/sentences: when user gets within 80 characters of the end, append more text automatically!
+    if (currentTarget.length - accepted.length < 80) {
+      const weakMap = storage.weakKeys[activeLang.id] || {};
+      const moreText = generatePracticeText(activeLang, mode, {
+        lessonId,
+        weakKeysMap: weakMap,
+        contentType,
+      }).normalize("NFC");
+      currentTarget = `${currentTarget} ${moreText}`;
+      targetTextRef.current = currentTarget;
+      setTargetText(currentTarget);
     }
+
+    setHasCurrentError(hitWrongKey);
+    typedTextRef.current = accepted;
+    setTypedText(accepted);
   };
 
   // Physical keydown handler using event.code for keyboard highlight & event.key for typing
@@ -273,7 +321,14 @@ export default function TypingBox({
   };
 
   const correctCharsLive = countCorrectChars(typedText, targetText);
-  const liveWpm = calculateWPM(correctCharsLive, Math.max(1, elapsedSeconds));
+  // Wait at least 1.5 seconds before displaying a live WPM number so the very first keystroke doesn't spike to 120+ WPM
+  const effectiveLiveSeconds = elapsedSeconds >= 1.5 ? elapsedSeconds : 0;
+  const liveWpm =
+     isFinished
+      ? calculateWPM(correctCharsLive, Math.max(1, elapsedSeconds))
+      : effectiveLiveSeconds > 0
+      ? calculateWPM(correctCharsLive, effectiveLiveSeconds)
+      : 0;
   const liveAccuracy = calculateAccuracy(
     correctCharsLive,
     Math.max(correctCharsLive, totalTypedRef.current)
@@ -285,7 +340,7 @@ export default function TypingBox({
   const isRTL = activeLang.direction === "rtl";
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col gap-5">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-4">
       {/* Top Bar: Language + Mode + Content Type */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {/* Language Pills */}
@@ -393,7 +448,7 @@ export default function TypingBox({
       </div>
 
       {/* RTL / Language Help Note */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-200">
+      <div className="flex items-center justify-between gap-2 px-4 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-200">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
           <span>{activeLang.helpNote}</span>
@@ -407,8 +462,8 @@ export default function TypingBox({
 
       {/* Live Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
+          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
             <Gauge className="w-5 h-5" />
           </div>
           <div>
@@ -419,8 +474,8 @@ export default function TypingBox({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
+          <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
             <Target className="w-5 h-5" />
           </div>
           <div>
@@ -431,8 +486,8 @@ export default function TypingBox({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
+          <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
             <Timer className="w-5 h-5" />
           </div>
           <div>
@@ -445,8 +500,8 @@ export default function TypingBox({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
-          <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
+          <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
             <Activity className="w-5 h-5" />
           </div>
           <div>
@@ -464,7 +519,7 @@ export default function TypingBox({
       <div
         onClick={() => inputRef.current?.focus()}
         dir={activeLang.direction}
-        className={`relative cursor-text rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 dark:focus-within:border-emerald-500 p-6 sm:p-8 shadow-sm transition-colors min-h-[190px] flex flex-col justify-between ${activeLang.fontClass}`}
+        className={`relative cursor-text rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 dark:focus-within:border-emerald-500 p-5 sm:p-6 shadow-sm transition-colors max-h-[180px] overflow-y-auto flex flex-col justify-between ${activeLang.fontClass}`}
       >
         {/* Hidden Input that captures all keystrokes and IME composition */}
         <input
@@ -485,7 +540,7 @@ export default function TypingBox({
           className="sr-only"
         />
 
-        {/* Prompt Display: For Urdu/Arabic joined scripts, per-span wrapping breaks ligature shaping in some browsers if not styled carefully, OR we render character spans with unicode-bidi & ligature-friendly font styling */}
+        {/* Prompt Display */}
         <div
           className={`select-none leading-relaxed tracking-wide ${
             isRTL ? "text-2xl sm:text-3xl leading-[2.4]" : "text-xl sm:text-2xl leading-relaxed"
@@ -508,6 +563,7 @@ export default function TypingBox({
             return (
               <span
                 key={idx}
+                ref={isCurrent ? activeCharRef : null}
                 className={`${colorClass} ${
                   isCurrent
                     ? hasCurrentError
@@ -523,7 +579,7 @@ export default function TypingBox({
         </div>
 
         {!isRunning && !isFinished && typedText.length === 0 && (
-          <div className="mt-4 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+          <div className="mt-3 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
             <span>{t.startTypingPrompt}</span>
           </div>
         )}
@@ -531,7 +587,7 @@ export default function TypingBox({
 
       {/* Post-Test Summary Banner */}
       {isFinished && (
-        <div className="p-6 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
+        <div className="p-5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
           <div className="flex items-start gap-3">
             {liveAccuracy >= 90 ? (
               <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />

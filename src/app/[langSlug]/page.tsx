@@ -32,7 +32,7 @@ export function generateMetadata({ params }: LangPageProps): Metadata {
     openGraph: {
       title,
       description,
-      url: `https://typelingo.com/${lang.slug}`,
+      url: `https://bigbirdcuration.com/${lang.slug}`,
       type: "website",
     },
   };
