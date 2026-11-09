@@ -1,0 +1,220 @@
+{
+  "id": "en",
+  "name": "English",
+  "nativeName": "English",
+  "slug": "english-typing-test",
+  "direction": "ltr",
+  "fontClass": "font-sans",
+  "fontFamilyName": "Inter",
+  "helpNote": "Use your standard QWERTY keyboard layout. Keep your index fingers on F and J.",
+  "keyboardRows": [
+    [
+      { "code": "Backquote", "label": "`", "shiftLabel": "~" },
+      { "code": "Digit1", "label": "1", "shiftLabel": "!" },
+      { "code": "Digit2", "label": "2", "shiftLabel": "@" },
+      { "code": "Digit3", "label": "3", "shiftLabel": "#" },
+      { "code": "Digit4", "label": "4", "shiftLabel": "$" },
+      { "code": "Digit5", "label": "5", "shiftLabel": "%" },
+      { "code": "Digit6", "label": "6", "shiftLabel": "^" },
+      { "code": "Digit7", "label": "7", "shiftLabel": "&" },
+      { "code": "Digit8", "label": "8", "shiftLabel": "*" },
+      { "code": "Digit9", "label": "9", "shiftLabel": "(" },
+      { "code": "Digit0", "label": "0", "shiftLabel": ")" },
+      { "code": "Minus", "label": "-", "shiftLabel": "_" },
+      { "code": "Equal", "label": "=", "shiftLabel": "+" },
+      { "code": "Backspace", "label": "⌫", "width": 2 }
+    ],
+    [
+      { "code": "Tab", "label": "Tab", "width": 1.5 },
+      { "code": "KeyQ", "label": "q", "shiftLabel": "Q" },
+      { "code": "KeyW", "label": "w", "shiftLabel": "W" },
+      { "code": "KeyE", "label": "e", "shiftLabel": "E" },
+      { "code": "KeyR", "label": "r", "shiftLabel": "R" },
+      { "code": "KeyT", "label": "t", "shiftLabel": "T" },
+      { "code": "KeyY", "label": "y", "shiftLabel": "Y" },
+      { "code": "KeyU", "label": "u", "shiftLabel": "U" },
+      { "code": "KeyI", "label": "i", "shiftLabel": "I" },
+      { "code": "KeyO", "label": "o", "shiftLabel": "O" },
+      { "code": "KeyP", "label": "p", "shiftLabel": "P" },
+      { "code": "BracketLeft", "label": "[", "shiftLabel": "{" },
+      { "code": "BracketRight", "label": "]", "shiftLabel": "}" },
+      { "code": "Backslash", "label": "\\", "shiftLabel": "|", "width": 1.5 }
+    ],
+    [
+      { "code": "CapsLock", "label": "Caps", "width": 1.8 },
+      { "code": "KeyA", "label": "a", "shiftLabel": "A" },
+      { "code": "KeyS", "label": "s", "shiftLabel": "S" },
+      { "code": "KeyD", "label": "d", "shiftLabel": "D" },
+      { "code": "KeyF", "label": "f", "shiftLabel": "F" },
+      { "code": "KeyG", "label": "g", "shiftLabel": "G" },
+      { "code": "KeyH", "label": "h", "shiftLabel": "H" },
+      { "code": "KeyJ", "label": "j", "shiftLabel": "J" },
+      { "code": "KeyK", "label": "k", "shiftLabel": "K" },
+      { "code": "KeyL", "label": "l", "shiftLabel": "L" },
+      { "code": "Semicolon", "label": ";", "shiftLabel": ":" },
+      { "code": "Quote", "label": "'", "shiftLabel": "\"" },
+      { "code": "Enter", "label": "Enter", "width": 2.2 }
+    ],
+    [
+      { "code": "ShiftLeft", "label": "Shift", "width": 2.4 },
+      { "code": "KeyZ", "label": "z", "shiftLabel": "Z" },
+      { "code": "KeyX", "label": "x", "shiftLabel": "X" },
+      { "code": "KeyC", "label": "c", "shiftLabel": "C" },
+      { "code": "KeyV", "label": "v", "shiftLabel": "V" },
+      { "code": "KeyB", "label": "b", "shiftLabel": "B" },
+      { "code": "KeyN", "label": "n", "shiftLabel": "N" },
+      { "code": "KeyM", "label": "m", "shiftLabel": "M" },
+      { "code": "Comma", "label": ",", "shiftLabel": "<" },
+      { "code": "Period", "label": ".", "shiftLabel": ">" },
+      { "code": "Slash", "label": "/", "shiftLabel": "?" },
+      { "code": "ShiftRight", "label": "Shift", "width": 2.6 }
+    ],
+    [
+      { "code": "Space", "label": "Space", "width": 8 }
+    ]
+  ],
+  "lessons": [
+    {
+      "id": "home-row",
+      "order": 1,
+      "titleKey": "homeRow",
+      "title": "1. Home Row Keys",
+      "description": "Master the center row: A S D F G H J K L ;",
+      "targetKeys": ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
+      "practiceText": [
+        "asdf jkl; asdf jkl; fdsa ;lkj fdsa ;lkj",
+        "dad sad lad fad ask flask fall hall salad",
+        "glas half dash lash shall جاگ flag glad had",
+        "ask a sad lad; a glad dad had aasha salad; fall glass"
+      ]
+    },
+    {
+      "id": "top-row",
+      "order": 2,
+      "titleKey": "topRow",
+      "title": "2. Top Row Keys",
+      "description": "Reach up to Q W E R T Y U I O P while anchored on the home row.",
+      "targetKeys": ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+      "practiceText": [
+        "qwer uiop qwer uiop trew poiu trew poiu",
+        "water power write quiet route towerilles outer",
+        "quoteetti pretty polite writer reportjaket",
+        "we write a quiet report; pour pure water into the pot"
+      ]
+    },
+    {
+      "id": "bottom-row",
+      "order": 3,
+      "titleKey": "bottomRow",
+      "title": "3. Bottom Row Keys",
+      "description": "Reach down to Z X C V B N M , . / with precision.",
+      "targetKeys": ["z", "x", "c", "v", "b", "n", "m", ",", "."],
+      "practiceText": [
+        "zxcv bnm, zxcv bnm, vcxz ,mnb vcxz ,mnb",
+        "cabin music seven zebra brazooxen move",
+        "brave civicozzarella nimble vector bronze",
+        "seven nimble zebras move across the calm bronze valley."
+      ]
+    },
+    {
+      "id": "numbers",
+      "order": 4,
+      "titleKey": "numbers",
+      "title": "4. Numbers Row",
+      "description": "Practice typing numbers 1 through 0 accurately without looking down.",
+      "targetKeys": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+      "practiceText": [
+        "1234 5678 90 1234 5678 90 0987 6543 21",
+        "10 20 30 40 50 60 70 80 90 100 2026 365",
+        "room 104 flight 782 page 395 score 98 order 450",
+        "on 12 may 2026 we counted 48 boxes and 390 books."
+      ]
+    },
+    {
+      "id": "words",
+      "order": 5,
+      "titleKey": "words",
+      "title": "5. Common Words",
+      "description": "Build muscle memory for high-frequency English words.",
+      "targetKeys": ["e", "t", "a", "o", "i", "n", "s", "r", "h", "l"],
+      "practiceText": [
+        "time person year way day thing man world life hand",
+        "part child eye woman place work week case point government",
+        "company number group problem fact people historynature",
+        "system program question work number night point home water"
+      ]
+    },
+    {
+      "id": "sentences",
+      "order": 6,
+      "titleKey": "sentences",
+      "title": "6. Full Sentences",
+      "description": "Type complete sentences with punctuation and rhythm.",
+      "targetKeys": [" ", ".", ","],
+      "practiceText": [
+        "Consistent daily practice is the fastest way to improve your typing speed.",
+        "Keep your wrists relaxed and look at the screen instead of your keyboard.",
+        "Accuracy always comes first, and speed follows naturally over time."
+      ]
+    }
+  ],
+  "words": [
+    "the", "be", "to", "of", "and", "a", "in", "that", "have", "it",
+    "for", "not", "on", "with", "he", "as", "you", "do", "at", "this",
+    "but", "his", "by", "from", "they", "we", "say", "her", "she", "or",
+    "an", "will", "my", "one", "all", "would", "there", "their", "what", "so",
+    "up", "out", "if", "about", "who", "get", "which", "go", "me", "when",
+    "make", "can", "like", "time", "no", "just", "him", "know", "take", "people",
+    "into", "year", "your", "good", "some", "could", "them", "see", "other", "than",
+    "then", "now", "look", "only", "come", "its", "over", "think", "also", "back",
+    "after", "use", "two", "how", "our", "work", "first", "well", "way", "even",
+    "new", "want", "because", "any", "these", "give", "day", "most", "us", "water",
+    "sound", "place", "very", "through", "great", "where", "help", "line", "right", "too",
+    "mean", "old", "same", "tell", "boy", "follow", "came", "show", "every", "good",
+    "sentence", "set", "three", "air", "put", "home", "read", "hand", "port", "large",
+    "spell", "add", "land", "here", "must", "big", "high", "such", "act", "why",
+    "ask", "men", "change", "went", "light", "kind", "off", "need", "house", "picture",
+    "try", "again", "animal", "point", "mother", "world", "near", "build", "self", "earth",
+    "father", "head", "stand", "own", "page", "should", "country", "found", "answer", "school",
+    "grow", "study", "still", "learn", "plant", "cover", "food", "sun", "four", "between",
+    "state", "keep", "eye", "never", "last", "let", "thought", "city", "tree", "cross",
+    "farm", "hard", "start", "might", "story", "saw", "far", "sea", "draw", "left",
+    "late", "run", "while", "press", "close", "night", "real", "life", "few", "north",
+    "open", "seem", "together", "next", "white", "children", "begin", "got", "walk", "example",
+    "ease", "paper", "group", "always", "music", "those", "both", "mark", "often", "letter",
+    "until", "mile", "river", "car", "feet", "care", "second", "book", "carry", "took",
+    "science", "eat", "room", "friend", "began", "idea", "fish", "mountain", "stop", "once"
+  ],
+  "sentences": [
+    "Touch typing helps you focus on your ideas rather than searching for keys.",
+    "The morning sun cast a warm golden glow across the quiet mountain valley.",
+    "Reading books every day expands your vocabulary and sharpens your mind.",
+    "Small habits practiced consistently lead to remarkable long term results.",
+    "Fresh rain cooled the city streets after a long and sunny summer afternoon.",
+    "Learning a new language opens doors to different cultures and friendships.",
+    "Keep your posture straight and your fingers curved gently over the home row.",
+    "A calm mind makes fewer mistakes when working under tight deadlines.",
+    "Technology works best when it simplifies daily life for everyone.",
+    "Music can lift your spirits and help you stay focused during deep work.",
+    "The old library stood at the corner of the square for over a century.",
+    "Writing clear and simple sentences is a valuable skill in every profession.",
+    "Travel teaches patience, curiosity, and appreciation for diverse traditions.",
+    "Healthy meals and regular sleep improve both memory and concentration.",
+    "Scientists discovered a new species of plant thriving in the deep ocean.",
+    "Kind words cost nothing yet carry great weight in someone else's day.",
+    "Every complex problem becomes manageable when broken into smaller steps.",
+    "Autumn leaves drifted slowly onto the wooden bridge above the stream.",
+    "Practice accuracy first and your typing speed will naturally increase.",
+    "Good design removes clutter so the essential message stands out clearly.",
+    "The train arrived at the platform right on schedule despite the heavy fog.",
+    "Teamwork succeeds when everyone listens carefully and shares ideas openly.",
+    "Early mornings offer quiet hours for reading, planning, and reflection.",
+    "A sturdy bicycle is one of the cleanest ways to explore a busy town.",
+    "Curiosity drives human progress from simple tools to modern spacecraft.",
+    "Honest feedback helps us grow stronger and refine our daily craft.",
+    "Stars appeared one by one as twilight faded over the desert horizon.",
+    "Clear goals turn vague wishes into practical daily action plans.",
+    "Digital backups protect your important work from unexpected hardware failure.",
+    "Patience and steady effort will help you master any keyboard layout."
+  ]
+}
