@@ -9,13 +9,26 @@ import {
   updatePreferences,
   clearWeakKeysForLanguage,
   importProgressJson,
+  supabase,
+  signInWithGoogle,
+  signOutUser,
+  syncStorageWithCloud,
 } from "@/lib/storage";
 import { getLanguageById, LANGUAGES_LIST } from "@/lib/languages";
 import { UI_TRANSLATIONS, UIStrings } from "@/lib/i18n";
 
+export interface AuthUserInfo {
+  id: string;
+  email?: string;
+  name?: string;
+  avatarUrl?: string;
+}
+
 interface AppContextValue {
   storage: UserStorageData;
   isHydrated: boolean;
+  user: AuthUserInfo | null;
+  authError: string | null;
   currentLanguage: LanguageConfig;
   uiLanguage: LanguageConfig;
   t: UIStrings;
@@ -26,6 +39,9 @@ interface AppContextValue {
   setDailyGoal: (goal: DailyGoal) => void;
   resetWeakKeys: (langId: string) => void;
   importBackup: (json: string) => { success: boolean; error?: string };
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  clearAuthError: () => void;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -33,11 +49,62 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [storage, setStorage] = useState<UserStorageData>(() => loadStorageData());
   const [isHydrated, setIsHydrated] = useState(false);
+  const [user, setUser] = useState<AuthUserInfo | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const loaded = loadStorageData();
     setStorage(loaded);
     setIsHydrated(true);
+
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        const sessionUser = data.session?.user;
+        if (sessionUser) {
+          const info: AuthUserInfo = {
+            id: sessionUser.id,
+            email: sessionUser.email,
+            name:
+              sessionUser.user_metadata?.full_name ||
+              sessionUser.user_metadata?.name ||
+              sessionUser.email,
+            avatarUrl: sessionUser.user_metadata?.avatar_url,
+          };
+          setUser(info);
+          syncStorageWithCloud(sessionUser.id, loaded).then((merged) => {
+            setStorage(merged);
+          });
+        }
+      });
+
+      const { data: listener } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          const sessionUser = session?.user;
+          if (sessionUser) {
+            const info: AuthUserInfo = {
+              id: sessionUser.id,
+              email: sessionUser.email,
+              name:
+                sessionUser.user_metadata?.full_name ||
+                sessionUser.user_metadata?.name ||
+                sessionUser.email,
+              avatarUrl: sessionUser.user_metadata?.avatar_url,
+            };
+            setUser(info);
+            const currentLocal = loadStorageData();
+            syncStorageWithCloud(sessionUser.id, currentLocal).then((merged) => {
+              setStorage(merged);
+            });
+          } else {
+            setUser(null);
+          }
+        }
+      );
+
+      return () => {
+        listener.subscription.unsubscribe();
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -125,11 +192,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: res.success, error: res.error };
   };
 
+  const loginWithGoogle = async () => {
+    setAuthError(null);
+    const res = await signInWithGoogle();
+    if (res.error) {
+      setAuthError(res.error);
+    }
+  };
+
+  const logout = async () => {
+    await signOutUser();
+    setUser(null);
+  };
+
+  const clearAuthError = () => setAuthError(null);
+
   return (
     <AppContext.Provider
       value={{
         storage,
         isHydrated,
+        user,
+        authError,
         currentLanguage,
         uiLanguage,
         t,
@@ -140,6 +224,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDailyGoal,
         resetWeakKeys,
         importBackup,
+        loginWithGoogle,
+        logout,
+        clearAuthError,
       }}
     >
       <div

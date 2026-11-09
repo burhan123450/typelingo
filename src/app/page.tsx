@@ -8,12 +8,12 @@ export default function HomePage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-10 flex flex-col gap-12">
       {/* Hero + Typing Box */}
-      <section className="flex flex-col gap-6">
-        <div className="text-center max-w-2xl mx-auto">
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+      <section className="flex flex-col gap-4">
+        <div className="text-center max-w-5xl mx-auto">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             Type faster in <span className="text-emerald-600 dark:text-emerald-400">any language</span>
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-2">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 sm:whitespace-nowrap overflow-hidden text-ellipsis">
             Master touch typing in English, Urdu (اردو), and Arabic (العربية) with live WPM analytics, smart weak-key practice, and interactive keyboards.
           </p>
         </div>

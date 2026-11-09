@@ -46,14 +46,14 @@ export default function LanguageSeoPage({ params }: LangPageProps) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-10">
-      <div className="text-center max-w-2xl mx-auto">
-        <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider">
+      <div className="text-center max-w-5xl mx-auto">
+        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider">
           {lang.name} ({lang.nativeName})
         </span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white mt-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1.5">
           {lang.name} Typing Test & Touch Typing Practice
         </h1>
-        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-2">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 sm:whitespace-nowrap overflow-hidden text-ellipsis">
           Improve your {lang.name} typing speed (WPM) and accuracy with our interactive on-screen keyboard, real-time metrics, and {lang.words.length}+ curated words and sentences.
         </p>
       </div>

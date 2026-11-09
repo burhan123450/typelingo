@@ -61,6 +61,7 @@ export default function TypingBox({
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [showKeyboard, setShowKeyboard] = useState<boolean>(true);
   const [pressedCode, setPressedCode] = useState<string | null>(null);
+  const [hasCurrentError, setHasCurrentError] = useState<boolean>(false);
 
   const durationForMode = (m: typeof mode): number => {
     if (m === "30s") return 30;
@@ -92,6 +93,7 @@ export default function TypingBox({
       setTypedText("");
       setIsRunning(false);
       setIsFinished(false);
+      setHasCurrentError(false);
       const dur = durationForMode(selectedMode);
       setTimeLeft(dur);
       setElapsedSeconds(0);
@@ -193,6 +195,7 @@ export default function TypingBox({
   }, [isRunning, isFinished, typedText, targetText, mode, countCorrectChars, finishTest]);
 
   // Process newly typed string (handles standard keys + RTL IME composition)
+  // Blocks advancing until the user types the exact expected character
   const applyNewTypedValue = (rawNewVal: string) => {
     if (isFinished) return;
     const normalized = rawNewVal.normalize("NFC");
@@ -201,26 +204,40 @@ export default function TypingBox({
       setIsRunning(true);
     }
 
-    // Check if user added characters
-    if (normalized.length > typedText.length) {
-      const addedCount = normalized.length - typedText.length;
-      totalTypedRef.current += addedCount;
+    // Allow backspace if user wants to step back
+    if (normalized.length < typedText.length) {
+      setTypedText(normalized);
+      setHasCurrentError(false);
+      return;
+    }
 
-      for (let i = typedText.length; i < normalized.length; i++) {
-        const typedChar = normalized[i];
-        const expectedChar = targetText[i];
-        if (expectedChar && typedChar !== expectedChar) {
-          errorMapRef.current[expectedChar] =
-            (errorMapRef.current[expectedChar] || 0) + 1;
-        }
+    // Check newly typed character(s) one by one; only advance on exact match
+    let accepted = typedText;
+    let hitWrongKey = false;
+
+    for (let i = typedText.length; i < normalized.length; i++) {
+      const typedChar = normalized[i];
+      const expectedChar = targetText[accepted.length];
+      if (!expectedChar) break;
+
+      totalTypedRef.current += 1;
+
+      if (typedChar === expectedChar) {
+        accepted += typedChar;
+        hitWrongKey = false;
+      } else {
+        errorMapRef.current[expectedChar] =
+          (errorMapRef.current[expectedChar] || 0) + 1;
+        hitWrongKey = true;
+        break; // Stop immediately: do not advance cursor until correct character is pressed
       }
     }
 
-    const clamped = normalized.slice(0, targetText.length);
-    setTypedText(clamped);
+    setHasCurrentError(hitWrongKey);
+    setTypedText(accepted);
 
-    if (clamped.length >= targetText.length && targetText.length > 0) {
-      finishTest(clamped, Math.max(1, elapsedSeconds));
+    if (accepted.length >= targetText.length && targetText.length > 0) {
+      finishTest(accepted, Math.max(1, elapsedSeconds));
     }
   };
 
@@ -483,7 +500,7 @@ export default function TypingBox({
             let colorClass = "text-slate-400 dark:text-slate-500";
             if (isCorrect) {
               colorClass = "text-emerald-600 dark:text-emerald-400";
-            } else if (isWrong) {
+            } else if (isWrong || (isCurrent && hasCurrentError)) {
               colorClass =
                 "text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/70 rounded";
             }
@@ -493,7 +510,9 @@ export default function TypingBox({
                 key={idx}
                 className={`${colorClass} ${
                   isCurrent
-                    ? "underline decoration-2 decoration-emerald-500 underline-offset-8 bg-emerald-500/10 rounded"
+                    ? hasCurrentError
+                      ? "underline decoration-2 decoration-rose-500 underline-offset-8 rounded"
+                      : "underline decoration-2 decoration-emerald-500 underline-offset-8 bg-emerald-500/10 rounded"
                     : ""
                 }`}
               >

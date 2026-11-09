@@ -1,8 +1,8 @@
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   UserStorageData,
   TestResult,
   DailyGoal,
-  LessonProgress,
 } from "@/types/typing";
 
 const STORAGE_KEY = "typelingo_v1_data";
@@ -20,6 +20,106 @@ const DEFAULT_DATA: UserStorageData = {
   lessonProgress: {},
   weakKeys: {},
 };
+
+// Optional Supabase client (active automatically once NEXT_PUBLIC_SUPABASE_URL & KEY are set in Vercel)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+export const supabase: SupabaseClient | null =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
+
+export function isSupabaseConfigured(): boolean {
+  return Boolean(supabase);
+}
+
+export async function signInWithGoogle(): Promise<{ error?: string }> {
+  if (!supabase) {
+    return {
+      error:
+        "Google Sign-In requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel Environment Variables.",
+    };
+  }
+  const redirectTo =
+    typeof window !== "undefined" ? window.location.origin : undefined;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function signOutUser(): Promise<void> {
+  if (!supabase) return;
+  await supabase.auth.signOut();
+}
+
+export async function syncStorageWithCloud(
+  userId: string,
+  localData: UserStorageData
+): Promise<UserStorageData> {
+  if (!supabase) return localData;
+  try {
+    const { data, error } = await supabase
+      .from("user_progress")
+      .select("payload")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!error && data?.payload) {
+      const cloudData = data.payload as UserStorageData;
+      // Merge results by unique id
+      const map = new Map<string, TestResult>();
+      for (const r of [...(cloudData.results || []), ...localData.results]) {
+        map.set(r.id, r);
+      }
+      const merged: UserStorageData = {
+        ...DEFAULT_DATA,
+        ...cloudData,
+        ...localData,
+        results: Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp),
+        lessonProgress: {
+          ...(cloudData.lessonProgress || {}),
+          ...localData.lessonProgress,
+        },
+        weakKeys: {
+          ...(cloudData.weakKeys || {}),
+          ...localData.weakKeys,
+        },
+      };
+      saveStorageData(merged);
+      await pushStorageToCloud(userId, merged);
+      return merged;
+    } else {
+      await pushStorageToCloud(userId, localData);
+      return localData;
+    }
+  } catch (e) {
+    console.error("Cloud sync error:", e);
+    return localData;
+  }
+}
+
+export async function pushStorageToCloud(
+  userId: string,
+  data: UserStorageData
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.from("user_progress").upsert(
+      {
+        user_id: userId,
+        payload: data,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+  } catch (e) {
+    console.error("Failed to push to cloud:", e);
+  }
+}
 
 export function getLocalDateString(date: Date = new Date()): string {
   const year = date.getFullYear();
@@ -54,6 +154,13 @@ export function saveStorageData(data: UserStorageData): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (supabase) {
+      supabase.auth.getUser().then(({ data: authData }) => {
+        if (authData?.user?.id) {
+          pushStorageToCloud(authData.user.id, data);
+        }
+      });
+    }
   } catch (e) {
     console.error("Failed to save storage data:", e);
   }
