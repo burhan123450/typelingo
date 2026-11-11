@@ -71,9 +71,9 @@ export default function HomePage() {
           <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
             <strong className="text-slate-900 dark:text-white block mb-0.5">
-              Instant & Private
+              Cloud Sync &amp; Local Backup
             </strong>
-            No account required in v1. Your progress is stored in your browser and can be exported anytime as JSON.
+            Sign in with Google to sync your progress across devices, or practice privately in your browser and export JSON backups anytime.
           </div>
         </div>
       </section>

@@ -18,6 +18,12 @@ export interface LessonConfig {
   practiceText: string[];
 }
 
+export interface LanguageSeoContent {
+  intro: string;
+  tips: string[];
+  faq: { q: string; a: string }[];
+}
+
 export interface LanguageConfig {
   id: string;
   name: string;
@@ -26,11 +32,13 @@ export interface LanguageConfig {
   direction: LanguageDirection;
   fontClass: string;
   fontFamilyName: string;
+  keyboardLayoutName: string;
   helpNote: string;
   keyboardRows: KeyMapping[][];
   lessons: LessonConfig[];
   words: string[];
   sentences: string[];
+  seo: LanguageSeoContent;
 }
 
 export interface TestResult {
@@ -65,6 +73,8 @@ export interface LessonProgress {
 
 export interface UserStorageData {
   version: number;
+  // Which signed-in account this browser data belongs to (null = guest, not signed in)
+  ownerUserId?: string | null;
   selectedLanguageId: string;
   uiLanguageId: string;
   theme: "light" | "dark";

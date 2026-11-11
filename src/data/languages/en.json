@@ -6,6 +6,7 @@
   "direction": "ltr",
   "fontClass": "font-sans",
   "fontFamilyName": "Inter",
+  "keyboardLayoutName": "US QWERTY",
   "helpNote": "Use your standard QWERTY keyboard layout. Keep your index fingers on F and J.",
   "keyboardRows": [
     [
@@ -84,8 +85,8 @@
       "practiceText": [
         "asdf jkl; asdf jkl; fdsa ;lkj fdsa ;lkj",
         "dad sad lad fad ask flask fall hall salad",
-        "glas half dash lash shall جاگ flag glad had",
-        "ask a sad lad; a glad dad had aasha salad; fall glass"
+        "glass half dash lash shall flag glad had",
+        "ask a sad lad; a glad dad had a fresh salad; fall glass"
       ]
     },
     {
@@ -97,8 +98,8 @@
       "targetKeys": ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
       "practiceText": [
         "qwer uiop qwer uiop trew poiu trew poiu",
-        "water power write quiet route towerilles outer",
-        "quoteetti pretty polite writer reportjaket",
+        "water power write quiet route tower outer",
+        "quote pretty polite writer report poetry",
         "we write a quiet report; pour pure water into the pot"
       ]
     },
@@ -111,8 +112,8 @@
       "targetKeys": ["z", "x", "c", "v", "b", "n", "m", ",", "."],
       "practiceText": [
         "zxcv bnm, zxcv bnm, vcxz ,mnb vcxz ,mnb",
-        "cabin music seven zebra brazooxen move",
-        "brave civicozzarella nimble vector bronze",
+        "cabin music seven zebra breeze oxen move",
+        "brave civic modern nimble vector bronze",
         "seven nimble zebras move across the calm bronze valley."
       ]
     },
@@ -140,7 +141,7 @@
       "practiceText": [
         "time person year way day thing man world life hand",
         "part child eye woman place work week case point government",
-        "company number group problem fact people historynature",
+        "company number group problem fact people history nature",
         "system program question work number night point home water"
       ]
     },
@@ -216,5 +217,23 @@
     "Clear goals turn vague wishes into practical daily action plans.",
     "Digital backups protect your important work from unexpected hardware failure.",
     "Patience and steady effort will help you master any keyboard layout."
-  ]
+  ],
+  "seo": {
+    "intro": "Practice your English touch typing on a standard US QWERTY layout with live WPM, accuracy, consistency tracking, and smart weak-key drills.",
+    "tips": [
+      "Rest your left fingers on A, S, D, F and your right fingers on J, K, L, ; — feel the small bumps on F and J without looking down.",
+      "Focus on 95%+ accuracy before pushing for speed; every avoided mistake saves two keystrokes.",
+      "Use our Weak Keys mode after a test to drill words built specifically from the letters you missed."
+    ],
+    "faq": [
+      {
+        "q": "What is a good English typing speed?",
+        "a": "An average typist types around 40 WPM. Reaching 60–80 WPM with 96%+ accuracy is considered fast and professional for office and programming work."
+      },
+      {
+        "q": "How is WPM calculated on BigBird?",
+        "a": "Every 5 correct characters count as 1 standard word, divided by the elapsed minutes: WPM = (correct characters / 5) / minutes."
+      }
+    ]
+  }
 }

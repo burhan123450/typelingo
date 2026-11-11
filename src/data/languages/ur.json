@@ -6,7 +6,8 @@
   "direction": "rtl",
   "fontClass": "font-urdu",
   "fontFamilyName": "Noto Nastaliq Urdu",
-  "helpNote": "Enable the Urdu keyboard in your device settings (Windows/Mac/Phonetic) before typing.",
+  "keyboardLayoutName": "Urdu Phonetic (CRULP)",
+  "helpNote": "Enable the Urdu Phonetic keyboard in your device settings (A=ا, S=س, D=د, F=ف) before typing.",
   "keyboardRows": [
     [
       { "code": "Backquote", "label": "`" },
@@ -212,5 +213,23 @@
     "رات کے اندھیرے میں آسمان پر ستارے چمک رہے ہیں۔",
     "اچھے الفاظ کا انتخاب آپ کی شخصیت کو ظاہر کرتا ہے۔",
     "مسلسل کوشش کرنے والا انسان کبھی ناکام نہیں ہوتا۔"
-  ]
+  ],
+  "seo": {
+    "intro": "Practice Urdu (اردو) touch typing online using the standard Urdu Phonetic keyboard layout with Noto Nastaliq Urdu typography, right-to-left (RTL) support, and live WPM tracking.",
+    "tips": [
+      "Enable the Urdu Phonetic keyboard in Windows/Mac settings so phonetic keys match our on-screen guide (A = ا, S = س, D = د, K = ک).",
+      "Practice Shift keys for retroflex letters like ٹ (Shift+T), ڈ (Shift+D), ڑ (Shift+R), and ں (Shift+N).",
+      "Keep your eyes on the Nastaliq text line and let the highlighted key guide your fingers."
+    ],
+    "faq": [
+      {
+        "q": "Which Urdu keyboard layout does BigBird use?",
+        "a": "BigBird uses the popular Urdu Phonetic (CRULP) layout where Urdu letters map phonetically to English QWERTY keys (for example, A for Alif ا and B for Bay ب)."
+      },
+      {
+        "q": "How do I type Urdu punctuation marks?",
+        "a": "Use the Period (.) key for the Urdu full stop (۔), Comma (,) for the Urdu comma (،), and Slash (/) for the Urdu question mark (؟)."
+      }
+    ]
+  }
 }

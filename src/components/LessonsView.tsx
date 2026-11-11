@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useApp } from "@/components/AppProvider";
 import { LANGUAGES_LIST } from "@/lib/languages";
 import TypingBox from "@/components/TypingBox";
@@ -13,7 +13,7 @@ export default function LessonsView() {
   if (!isHydrated) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-12 text-center text-slate-500">
-        Loading lessons...
+        {t.loading}
       </div>
     );
   }
@@ -40,24 +40,26 @@ export default function LessonsView() {
             className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to all {currentLanguage.name} lessons</span>
+            <span>{t.backToLessons}</span>
           </button>
 
           {selectedLesson && (
             <div className="text-sm font-bold text-slate-900 dark:text-white">
               {selectedLesson.title} —{" "}
               <span className="text-emerald-600 dark:text-emerald-400">
-                Requires 90%+ accuracy to unlock next lesson
+                {t.needs90}
               </span>
             </div>
           )}
         </div>
 
-        <TypingBox
-          forcedLanguage={currentLanguage}
-          initialMode="lesson"
-          lessonId={activeLessonId}
-        />
+        <Suspense fallback={null}>
+          <TypingBox
+            forcedLanguage={currentLanguage}
+            initialMode="lesson"
+            lessonId={activeLessonId}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -113,7 +115,7 @@ export default function LessonsView() {
               <div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    Lesson {lesson.order}
+                    {t.lessonLabel} {lesson.order}
                   </span>
                   {completed ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
@@ -142,7 +144,7 @@ export default function LessonsView() {
                       key={kIdx}
                       className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
                     >
-                      {k === " " ? "Space" : k}
+                      {k === " " ? t.space : k}
                     </span>
                   ))}
                 </div>
@@ -153,13 +155,13 @@ export default function LessonsView() {
                   <div className="text-xs text-slate-500 flex items-center gap-2">
                     <Award className="w-4 h-4 text-amber-500" />
                     <span>
-                      Best: <strong>{prog.bestWpm} WPM</strong> (
+                      {t.best}: <strong>{prog.bestWpm} WPM</strong> (
                       <strong>{prog.bestAccuracy}%</strong>)
                     </span>
                   </div>
                 ) : (
                   <div className="text-xs text-slate-400">
-                    {unlocked ? "Ready to start" : t.lessonUnlockHint}
+                    {unlocked ? t.readyToStart : t.lessonUnlockHint}
                   </div>
                 )}
 
@@ -174,7 +176,7 @@ export default function LessonsView() {
                   }`}
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>{completed ? "Practice Again" : "Start Lesson"}</span>
+                  <span>{completed ? t.practiceAgain : t.startLesson}</span>
                 </button>
               </div>
             </div>

@@ -1,43 +1,49 @@
 import { MetadataRoute } from "next";
 import { LANGUAGES_LIST } from "@/lib/languages";
+import { SITE_URL } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://bigbirdcuration.com";
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
-      url: `${baseUrl}/`,
+      url: `${SITE_URL}/`,
       lastModified: now,
       changeFrequency: "daily",
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/lessons`,
+      url: `${SITE_URL}/lessons`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/dashboard`,
+      url: `${SITE_URL}/dashboard`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/about`,
+      url: `${SITE_URL}/about`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/privacy`,
+      url: `${SITE_URL}/privacy`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/contact`,
+      url: `${SITE_URL}/terms`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/contact`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.5,
@@ -45,7 +51,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   const languageRoutes: MetadataRoute.Sitemap = LANGUAGES_LIST.map((lang) => ({
-    url: `${baseUrl}/${lang.slug}`,
+    url: `${SITE_URL}/${lang.slug}`,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.9,

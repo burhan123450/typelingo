@@ -6,7 +6,8 @@
   "direction": "rtl",
   "fontClass": "font-arabic",
   "fontFamilyName": "Noto Naskh Arabic",
-  "helpNote": "Enable the Arabic keyboard in your device settings (Arabic 101 / PC) before typing.",
+  "keyboardLayoutName": "Arabic (101) Standard",
+  "helpNote": "Enable the standard Arabic (101 / PC) keyboard in your device settings before typing.",
   "keyboardRows": [
     [
       { "code": "Backquote", "label": "ذ", "shiftLabel": "ّ" },
@@ -30,7 +31,7 @@
       { "code": "KeyW", "label": "ص", "shiftLabel": "ً" },
       { "code": "KeyE", "label": "ث", "shiftLabel": "ُ" },
       { "code": "KeyR", "label": "ق", "shiftLabel": "ٌ" },
-      { "code": "KeyT", "label": "ف", "shiftLabel": "إ" },
+      { "code": "KeyT", "label": "ف", "shiftLabel": "لإ" },
       { "code": "KeyY", "label": "غ", "shiftLabel": "إ" },
       { "code": "KeyU", "label": "ع", "shiftLabel": "‘" },
       { "code": "KeyI", "label": "ه", "shiftLabel": "÷" },
@@ -46,7 +47,7 @@
       { "code": "KeyS", "label": "س", "shiftLabel": "ٍ" },
       { "code": "KeyD", "label": "ي", "shiftLabel": "]" },
       { "code": "KeyF", "label": "ب", "shiftLabel": "[" },
-      { "code": "KeyG", "label": "ل", "shiftLabel": "أ" },
+      { "code": "KeyG", "label": "ل", "shiftLabel": "لأ" },
       { "code": "KeyH", "label": "ا", "shiftLabel": "أ" },
       { "code": "KeyJ", "label": "ت", "shiftLabel": "ـ" },
       { "code": "KeyK", "label": "ن", "shiftLabel": "،" },
@@ -211,5 +212,23 @@
     "الاستماع الجيد للآخرين يعكس الاحترام المتبادل والحكمة.",
     "حفظ النسخ الاحتياطية يحمي بياناتك المهمة من الضياع المفاجئ.",
     "الاستمرار في المحاولة هو الطريق الأكيد للوصول إلى القمة."
-  ]
+  ],
+  "seo": {
+    "intro": "Practice Arabic (العربية) touch typing online on the standard Arabic 101 keyboard with clear Noto Naskh Arabic script, RTL alignment, and real-time WPM analytics.",
+    "tips": [
+      "Place your index fingers on ب (F) and ت (J) — the center of the Arabic home row.",
+      "Pay close attention to Hamza forms: أ (Shift+H), إ (Shift+Y), ء (X), ئ (Z), and ؤ (C).",
+      "Complete each of the 6 Arabic lessons with 90%+ accuracy to build effortless muscle memory."
+    ],
+    "faq": [
+      {
+        "q": "Which Arabic keyboard layout is supported?",
+        "a": "BigBird uses the standard Arabic (101) PC keyboard layout included by default on Windows, macOS, and Linux."
+      },
+      {
+        "q": "Do I need to type harakat (diacritics) in the standard tests?",
+        "a": "Our standard word and sentence tests focus on clean modern standard Arabic letters and punctuation so you can build practical everyday speed."
+      }
+    ]
+  }
 }

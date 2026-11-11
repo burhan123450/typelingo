@@ -1,8 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { UserStorageData, TestResult, DailyGoal, LanguageConfig } from "@/types/typing";
 import {
+  DEFAULT_DATA,
   loadStorageData,
   saveTestResult,
   updateDailyGoal,
@@ -13,6 +14,7 @@ import {
   signInWithGoogle,
   signOutUser,
   syncStorageWithCloud,
+  deleteCloudData,
 } from "@/lib/storage";
 import { getLanguageById, LANGUAGES_LIST } from "@/lib/languages";
 import { UI_TRANSLATIONS, UIStrings } from "@/lib/i18n";
@@ -41,171 +43,143 @@ interface AppContextValue {
   importBackup: (json: string) => { success: boolean; error?: string };
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  deleteMyCloudData: () => Promise<{ error?: string }>;
   clearAuthError: () => void;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
+const FONT_LINKS: Record<string, string> = {
+  ur: "https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap",
+  ar: "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap",
+};
+
+function toUserInfo(u: {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, string | undefined>;
+}): AuthUserInfo {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.user_metadata?.full_name || u.user_metadata?.name || u.email,
+    avatarUrl: u.user_metadata?.avatar_url,
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [storage, setStorage] = useState<UserStorageData>(() => loadStorageData());
+  // Start with defaults on BOTH server and browser (prevents the hydration flicker),
+  // then load the saved browser data right after the page appears.
+  const [storage, setStorage] = useState<UserStorageData>(DEFAULT_DATA);
   const [isHydrated, setIsHydrated] = useState(false);
   const [user, setUser] = useState<AuthUserInfo | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const syncingFor = useRef<string | null>(null);
 
   useEffect(() => {
-    const loaded = loadStorageData();
-    setStorage(loaded);
+    setStorage(loadStorageData());
     setIsHydrated(true);
 
-    if (supabase) {
-      supabase.auth.getSession().then(({ data }) => {
-        const sessionUser = data.session?.user;
-        if (sessionUser) {
-          const info: AuthUserInfo = {
-            id: sessionUser.id,
-            email: sessionUser.email,
-            name:
-              sessionUser.user_metadata?.full_name ||
-              sessionUser.user_metadata?.name ||
-              sessionUser.email,
-            avatarUrl: sessionUser.user_metadata?.avatar_url,
-          };
-          setUser(info);
-          syncStorageWithCloud(sessionUser.id, loaded).then((merged) => {
-            setStorage(merged);
-          });
-        }
-      });
+    if (!supabase) return;
 
-      const { data: listener } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          const sessionUser = session?.user;
-          if (sessionUser) {
-            const info: AuthUserInfo = {
-              id: sessionUser.id,
-              email: sessionUser.email,
-              name:
-                sessionUser.user_metadata?.full_name ||
-                sessionUser.user_metadata?.name ||
-                sessionUser.email,
-              avatarUrl: sessionUser.user_metadata?.avatar_url,
-            };
-            setUser(info);
-            const currentLocal = loadStorageData();
-            syncStorageWithCloud(sessionUser.id, currentLocal).then((merged) => {
-              setStorage(merged);
-            });
-          } else {
-            setUser(null);
-          }
-        }
-      );
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      const sessionUser = session?.user;
 
-      return () => {
-        listener.subscription.unsubscribe();
-      };
-    }
+      if (sessionUser && (event === "INITIAL_SESSION" || event === "SIGNED_IN")) {
+        setUser(toUserInfo(sessionUser));
+        if (syncingFor.current === sessionUser.id) return;
+        syncingFor.current = sessionUser.id;
+        syncStorageWithCloud(sessionUser.id).then((merged) => setStorage(merged));
+      } else if (event === "SIGNED_OUT") {
+        syncingFor.current = null;
+        setUser(null);
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Dark / light mode
   useEffect(() => {
     if (!isHydrated) return;
-    const root = document.documentElement;
-    if (storage.theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    document.documentElement.classList.toggle("dark", storage.theme === "dark");
   }, [storage.theme, isHydrated]);
-
-  // Dynamically load Noto Nastaliq Urdu or Noto Naskh Arabic ONLY when selected
-  useEffect(() => {
-    if (!isHydrated) return;
-    const activeIds = new Set([storage.selectedLanguageId, storage.uiLanguageId]);
-
-    if (activeIds.has("ur")) {
-      const id = "typelingo-font-urdu";
-      if (!document.getElementById(id)) {
-        const link = document.createElement("link");
-        link.id = id;
-        link.rel = "stylesheet";
-        link.href =
-          "https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap";
-        document.head.appendChild(link);
-      }
-    }
-
-    if (activeIds.has("ar")) {
-      const id = "typelingo-font-arabic";
-      if (!document.getElementById(id)) {
-        const link = document.createElement("link");
-        link.id = id;
-        link.rel = "stylesheet";
-        link.href =
-          "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&display=swap";
-        document.head.appendChild(link);
-      }
-    }
-  }, [storage.selectedLanguageId, storage.uiLanguageId, isHydrated]);
 
   const currentLanguage = getLanguageById(storage.selectedLanguageId);
   const uiLanguage = getLanguageById(storage.uiLanguageId);
   const t = UI_TRANSLATIONS[storage.uiLanguageId] || UI_TRANSLATIONS.en;
 
+  // Page language + direction (tells browsers and Google which language the UI is in)
+  useEffect(() => {
+    if (!isHydrated) return;
+    document.documentElement.lang = uiLanguage.id;
+    document.documentElement.dir = uiLanguage.direction;
+  }, [uiLanguage.id, uiLanguage.direction, isHydrated]);
+
+  // Load the Urdu / Arabic font ONLY when that language is in use
+  useEffect(() => {
+    if (!isHydrated) return;
+    const activeIds = new Set([storage.selectedLanguageId, storage.uiLanguageId]);
+    for (const [langId, href] of Object.entries(FONT_LINKS)) {
+      const id = `bigbird-font-${langId}`;
+      if (activeIds.has(langId) && !document.getElementById(id)) {
+        const link = document.createElement("link");
+        link.id = id;
+        link.rel = "stylesheet";
+        link.href = href;
+        document.head.appendChild(link);
+      }
+    }
+  }, [storage.selectedLanguageId, storage.uiLanguageId, isHydrated]);
+
   const setTypingLanguage = (langId: string) => {
     if (!LANGUAGES_LIST.some((l) => l.id === langId)) return;
-    const next = updatePreferences({ selectedLanguageId: langId });
-    setStorage(next);
+    setStorage(updatePreferences({ selectedLanguageId: langId }));
   };
 
   const setUiLanguage = (langId: string) => {
     if (!LANGUAGES_LIST.some((l) => l.id === langId)) return;
-    const next = updatePreferences({ uiLanguageId: langId });
-    setStorage(next);
+    setStorage(updatePreferences({ uiLanguageId: langId }));
   };
 
   const toggleTheme = () => {
-    const nextTheme = storage.theme === "dark" ? "light" : "dark";
-    const next = updatePreferences({ theme: nextTheme });
-    setStorage(next);
+    setStorage(updatePreferences({ theme: storage.theme === "dark" ? "light" : "dark" }));
   };
 
-  const recordTestResult = (result: TestResult) => {
-    const next = saveTestResult(result);
-    setStorage(next);
-  };
-
-  const setDailyGoal = (goal: DailyGoal) => {
-    const next = updateDailyGoal(goal);
-    setStorage(next);
-  };
-
-  const resetWeakKeys = (langId: string) => {
-    const next = clearWeakKeysForLanguage(langId);
-    setStorage(next);
-  };
+  const recordTestResult = (result: TestResult) => setStorage(saveTestResult(result));
+  const setDailyGoal = (goal: DailyGoal) => setStorage(updateDailyGoal(goal));
+  const resetWeakKeys = (langId: string) => setStorage(clearWeakKeysForLanguage(langId));
 
   const importBackup = (json: string) => {
     const res = importProgressJson(json);
-    if (res.success && res.data) {
-      setStorage(res.data);
-    }
+    if (res.success && res.data) setStorage(res.data);
     return { success: res.success, error: res.error };
   };
 
   const loginWithGoogle = async () => {
     setAuthError(null);
     const res = await signInWithGoogle();
-    if (res.error) {
-      setAuthError(res.error);
-    }
+    if (res.error) setAuthError(res.error);
   };
 
   const logout = async () => {
-    await signOutUser();
+    const cleared = await signOutUser();
+    syncingFor.current = null;
     setUser(null);
+    setStorage(cleared);
   };
 
-  const clearAuthError = () => setAuthError(null);
+  const deleteMyCloudData = async () => {
+    if (!user) return { error: "Not signed in." };
+    const res = await deleteCloudData(user.id);
+    if (!res.error) {
+      const cleared = await signOutUser();
+      syncingFor.current = null;
+      setUser(null);
+      setStorage(cleared);
+    }
+    return res;
+  };
 
   return (
     <AppContext.Provider
@@ -226,29 +200,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         importBackup,
         loginWithGoogle,
         logout,
-        clearAuthError,
+        deleteMyCloudData,
+        clearAuthError: () => setAuthError(null),
       }}
     >
-      <div
-        dir={uiLanguage.direction}
-        className={`min-h-screen flex flex-col transition-colors duration-200 ${
-          uiLanguage.id === "ur"
-            ? "font-urdu"
-            : uiLanguage.id === "ar"
-            ? "font-arabic"
-            : "font-sans"
-        }`}
-      >
-        {children}
-      </div>
+      <div className={`min-h-screen flex flex-col ${uiLanguage.fontClass}`}>{children}</div>
     </AppContext.Provider>
   );
 }
 
 export function useApp() {
   const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error("useApp must be used inside AppProvider");
-  }
+  if (!ctx) throw new Error("useApp must be used inside AppProvider");
   return ctx;
 }

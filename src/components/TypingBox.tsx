@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { LanguageConfig, TestResult } from "@/types/typing";
 import { useApp } from "@/components/AppProvider";
 import { generatePracticeText, LANGUAGES_LIST } from "@/lib/languages";
@@ -41,6 +42,7 @@ export default function TypingBox({
     recordTestResult,
   } = useApp();
 
+  const searchParams = useSearchParams();
   const activeLang = forcedLanguage || currentLanguage;
 
   // Sync forcedLanguage with app context on mount if provided
@@ -51,8 +53,15 @@ export default function TypingBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forcedLanguage?.id]);
 
+  const urlMode = searchParams?.get("mode");
+  const startingMode: "30s" | "60s" | "120s" | "lesson" | "weak-keys" = lessonId
+    ? "lesson"
+    : urlMode === "weak-keys"
+    ? "weak-keys"
+    : initialMode;
+
   const [mode, setMode] = useState<"30s" | "60s" | "120s" | "lesson" | "weak-keys">(
-    lessonId ? "lesson" : initialMode
+    startingMode
   );
   const [contentType, setContentType] = useState<"sentences" | "words">("sentences");
   const [targetText, setTargetText] = useState<string>("");
@@ -62,6 +71,20 @@ export default function TypingBox({
   const [showKeyboard, setShowKeyboard] = useState<boolean>(true);
   const [pressedCode, setPressedCode] = useState<string | null>(null);
   const [hasCurrentError, setHasCurrentError] = useState<boolean>(false);
+
+  // Hide on-screen keyboard by default on narrow mobile screens so typing area stays visible
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      setShowKeyboard(false);
+    }
+  }, []);
+
+  // Honor ?mode=weak-keys when navigating from Dashboard
+  useEffect(() => {
+    if (!lessonId && urlMode === "weak-keys" && mode !== "weak-keys") {
+      setMode("weak-keys");
+    }
+  }, [urlMode, lessonId, mode]);
 
   const durationForMode = (m: typeof mode): number => {
     if (m === "30s") return 30;
@@ -78,6 +101,7 @@ export default function TypingBox({
   const typedTextRef = useRef<string>("");
   const targetTextRef = useRef<string>("");
   const totalTypedRef = useRef<number>(0);
+  const lastSampleCorrectRef = useRef<number>(0);
   const errorMapRef = useRef<Record<string, number>>({});
   const wpmSamplesRef = useRef<number[]>([]);
   const isComposingRef = useRef<boolean>(false);
@@ -107,6 +131,7 @@ export default function TypingBox({
       setElapsedSeconds(0);
       startTimeMsRef.current = null;
       totalTypedRef.current = 0;
+      lastSampleCorrectRef.current = 0;
       errorMapRef.current = {};
       wpmSamplesRef.current = [];
       savedResultRef.current = false;
@@ -203,8 +228,11 @@ export default function TypingBox({
           typedTextRef.current,
           targetTextRef.current
         );
-        const sampleWpm = calculateWPM(correctNow, exactElapsed);
-        wpmSamplesRef.current.push(sampleWpm);
+        const charsInThisSecond = Math.max(0, correctNow - lastSampleCorrectRef.current);
+        lastSampleCorrectRef.current = correctNow;
+        // Per-second instantaneous WPM sample for true consistency calculation
+        const instantWpm = calculateWPM(charsInThisSecond, 1);
+        wpmSamplesRef.current.push(instantWpm);
       }
 
       if (exactElapsed >= totalDuration) {
@@ -227,8 +255,9 @@ export default function TypingBox({
   }, [typedText.length]);
 
   // Process newly typed string (handles standard keys + RTL IME composition)
-  // Blocks advancing until the user types the exact expected character
-  // And endlessly appends new words/sentences if the timer is still running!
+  // Blocks advancing until the user types the exact expected character.
+  // For timed tests (30s/60s/120s/weak-keys), endlessly appends new words;
+  // for lessons, finishes as soon as the lesson text is completed!
   const applyNewTypedValue = (rawNewVal: string) => {
     if (isFinished) return;
     const normalized = rawNewVal.normalize("NFC");
@@ -271,8 +300,20 @@ export default function TypingBox({
       }
     }
 
-    // Infinite words/sentences: when user gets within 80 characters of the end, append more text automatically!
-    if (currentTarget.length - accepted.length < 80) {
+    // If this is a LESSON, complete immediately when the user finishes typing the lesson text!
+    if (mode === "lesson" && accepted.length >= currentTarget.length && currentTarget.length > 0) {
+      setHasCurrentError(false);
+      typedTextRef.current = accepted;
+      setTypedText(accepted);
+      const exactSec = startTimeMsRef.current
+        ? (Date.now() - startTimeMsRef.current) / 1000
+        : elapsedSeconds;
+      finishTest(accepted, Math.max(1, exactSec));
+      return;
+    }
+
+    // For timed modes (non-lesson), endlessly append more text when within 80 characters of the end
+    if (mode !== "lesson" && currentTarget.length - accepted.length < 80) {
       const weakMap = storage.weakKeys[activeLang.id] || {};
       const moreText = generatePracticeText(activeLang, mode, {
         lessonId,
@@ -321,23 +362,30 @@ export default function TypingBox({
   };
 
   const correctCharsLive = countCorrectChars(typedText, targetText);
-  // Wait at least 1.5 seconds before displaying a live WPM number so the very first keystroke doesn't spike to 120+ WPM
+  const totalTypedLive = Math.max(correctCharsLive, totalTypedRef.current);
+  const mistakesLive = Math.max(0, totalTypedLive - correctCharsLive);
   const effectiveLiveSeconds = elapsedSeconds >= 1.5 ? elapsedSeconds : 0;
-  const liveWpm =
-     isFinished
-      ? calculateWPM(correctCharsLive, Math.max(1, elapsedSeconds))
-      : effectiveLiveSeconds > 0
-      ? calculateWPM(correctCharsLive, effectiveLiveSeconds)
-      : 0;
-  const liveAccuracy = calculateAccuracy(
-    correctCharsLive,
-    Math.max(correctCharsLive, totalTypedRef.current)
-  );
+  const liveWpm = isFinished
+    ? calculateWPM(correctCharsLive, Math.max(1, elapsedSeconds))
+    : effectiveLiveSeconds > 0
+    ? calculateWPM(correctCharsLive, effectiveLiveSeconds)
+    : 0;
+  const rawWpm = isFinished
+    ? calculateWPM(totalTypedLive, Math.max(1, elapsedSeconds))
+    : effectiveLiveSeconds > 0
+    ? calculateWPM(totalTypedLive, effectiveLiveSeconds)
+    : 0;
+  const liveAccuracy = calculateAccuracy(correctCharsLive, totalTypedLive);
   const liveConsistency = calculateConsistency(wpmSamplesRef.current);
   const nextChar =
     typedText.length < targetText.length ? targetText[typedText.length] : null;
 
   const isRTL = activeLang.direction === "rtl";
+
+  const topMissedKeys = Object.entries(errorMapRef.current)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col gap-4">
@@ -403,7 +451,7 @@ export default function TypingBox({
                       : "text-slate-500"
                   }`}
                 >
-                  Sentences
+                  {t.sentences}
                 </button>
                 <button
                   type="button"
@@ -414,7 +462,7 @@ export default function TypingBox({
                       : "text-slate-500"
                   }`}
                 >
-                  Words
+                  {t.words}
                 </button>
               </div>
             )}
@@ -448,16 +496,21 @@ export default function TypingBox({
       </div>
 
       {/* RTL / Language Help Note */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-200">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-200">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
           <span>{activeLang.helpNote}</span>
         </div>
-        {isRTL && (
-          <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-[11px] font-semibold shrink-0">
-            RTL Mode Active
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-xs font-semibold">
+            {t.keyboardLayout}: {activeLang.keyboardLayoutName}
           </span>
-        )}
+          {isRTL && (
+            <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs font-semibold">
+              {t.rtlActive}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Live Stats Row */}
@@ -519,7 +572,11 @@ export default function TypingBox({
       <div
         onClick={() => inputRef.current?.focus()}
         dir={activeLang.direction}
-        className={`relative cursor-text rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 dark:focus-within:border-emerald-500 p-5 sm:p-6 shadow-sm transition-colors max-h-[180px] overflow-y-auto flex flex-col justify-between ${activeLang.fontClass}`}
+        className={`relative cursor-text rounded-2xl bg-white dark:bg-slate-900 border-2 ${
+          hasCurrentError
+            ? "border-rose-500 dark:border-rose-500"
+            : "border-slate-200 dark:border-slate-800 focus-within:border-emerald-500 dark:focus-within:border-emerald-500"
+        } p-5 sm:p-6 shadow-sm transition-colors max-h-[185px] overflow-y-auto flex flex-col justify-between ${activeLang.fontClass}`}
       >
         {/* Hidden Input that captures all keystrokes and IME composition */}
         <input
@@ -578,58 +635,99 @@ export default function TypingBox({
           })}
         </div>
 
-        {!isRunning && !isFinished && typedText.length === 0 && (
-          <div className="mt-3 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-            <span>{t.startTypingPrompt}</span>
+        {hasCurrentError ? (
+          <div className="mt-3 text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+            <span>{t.wrongKeyHint}</span>
           </div>
+        ) : (
+          !isRunning &&
+          !isFinished &&
+          typedText.length === 0 && (
+            <div className="mt-3 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <span>{t.startTypingPrompt}</span>
+            </div>
+          )
         )}
       </div>
 
-      {/* Post-Test Summary Banner */}
+      {/* Detailed Post-Test Summary Card */}
       {isFinished && (
-        <div className="p-5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
-          <div className="flex items-start gap-3">
-            {liveAccuracy >= 90 ? (
-              <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            ) : (
-              <AlertTriangle className="w-7 h-7 text-amber-500 shrink-0 mt-0.5" />
-            )}
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                {t.testCompleted}
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-                {t.wpm}: <strong>{liveWpm}</strong> · {t.accuracy}:{" "}
-                <strong>{liveAccuracy}%</strong> · {t.consistency}:{" "}
-                <strong>{liveConsistency}%</strong>
-                {lessonId &&
-                  (liveAccuracy >= 90
-                    ? " — Lesson passed (90%+ accuracy)! Next lesson unlocked."
-                    : " — Need 90%+ accuracy to unlock the next lesson. Try again!")}
-              </p>
+        <div className="p-5 sm:p-6 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              {liveAccuracy >= 90 ? (
+                <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <AlertTriangle className="w-7 h-7 text-amber-500 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {t.testCompleted}
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
+                  {t.wpm}: <strong>{liveWpm}</strong> · {t.rawWpm}:{" "}
+                  <strong>{rawWpm}</strong> · {t.accuracy}:{" "}
+                  <strong>{liveAccuracy}%</strong> · {t.consistency}:{" "}
+                  <strong>{liveConsistency}%</strong>
+                </p>
+                {lessonId && (
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mt-1">
+                    {liveAccuracy >= 90 ? t.lessonPassed : t.lessonFailed}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => initTest(mode, activeLang, contentType)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm transition-colors"
+              >
+                {t.tryAgain}
+              </button>
+              {!lessonId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("weak-keys");
+                    initTest("weak-keys", activeLang, contentType);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  {t.practiceWeakKeys}
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => initTest(mode, activeLang, contentType)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm transition-colors"
-            >
-              {t.tryAgain}
-            </button>
-            {!lessonId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("weak-keys");
-                  initTest("weak-keys", activeLang, contentType);
-                }}
-                className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-              >
-                {t.practiceWeakKeys}
-              </button>
-            )}
+          {/* Extra Breakdown: Correct Chars, Mistakes & Most Missed Keys */}
+          <div className="pt-3 border-t border-emerald-200/70 dark:border-emerald-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-4">
+              <span>
+                {t.correctChars}: <strong>{correctCharsLive}</strong>
+              </span>
+              <span>
+                {t.mistakes}: <strong>{mistakesLive}</strong>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-semibold">{t.mostMissed}:</span>
+              {topMissedKeys.length === 0 ? (
+                <span className="text-emerald-700 dark:text-emerald-300">
+                  {t.noMistakes}
+                </span>
+              ) : (
+                topMissedKeys.map(([ch, cnt]) => (
+                  <span
+                    key={ch}
+                    className="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-bold"
+                  >
+                    {ch === " " ? t.space : ch} ({cnt})
+                  </span>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

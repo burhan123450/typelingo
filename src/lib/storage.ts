@@ -1,14 +1,19 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import {
-  UserStorageData,
-  TestResult,
-  DailyGoal,
-} from "@/types/typing";
+import { UserStorageData, TestResult, DailyGoal, LessonProgress } from "@/types/typing";
 
+/**
+ * ALL data storage lives in this one file.
+ * - Guests: data is kept in the browser (localStorage).
+ * - Signed-in users (Gmail): the same data is also synced to Supabase.
+ *
+ * NOTE: the key name below is kept from v1 on purpose, so existing visitors
+ * do not lose their progress after the BigBird rename.
+ */
 const STORAGE_KEY = "typelingo_v1_data";
 
-const DEFAULT_DATA: UserStorageData = {
+export const DEFAULT_DATA: UserStorageData = {
   version: 1,
+  ownerUserId: null,
   selectedLanguageId: "en",
   uiLanguageId: "en",
   theme: "dark",
@@ -21,14 +26,13 @@ const DEFAULT_DATA: UserStorageData = {
   weakKeys: {},
 };
 
-// Optional Supabase client (active automatically once NEXT_PUBLIC_SUPABASE_URL & KEY are set in Vercel)
+// ---------- Supabase (active only when the two Vercel environment variables exist) ----------
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 export const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
+  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(supabase);
@@ -38,11 +42,13 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
   if (!supabase) {
     return {
       error:
-        "Google Sign-In requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel Environment Variables.",
+        "Gmail sign-in is not set up yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.",
     };
   }
   const redirectTo =
-    typeof window !== "undefined" ? window.location.origin : undefined;
+    typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname}`
+      : undefined;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo },
@@ -51,16 +57,82 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
   return {};
 }
 
-export async function signOutUser(): Promise<void> {
-  if (!supabase) return;
-  await supabase.auth.signOut();
+/**
+ * Signs out AND clears this browser's progress, so the next person
+ * using the same computer does not see (or inherit) your data.
+ * Theme and language choices are kept.
+ */
+export async function signOutUser(): Promise<UserStorageData> {
+  const current = loadStorageData();
+  if (supabase && current.ownerUserId) {
+    await pushStorageToCloud(current.ownerUserId, current);
+    await supabase.auth.signOut();
+  }
+  const cleared: UserStorageData = {
+    ...DEFAULT_DATA,
+    theme: current.theme,
+    uiLanguageId: current.uiLanguageId,
+    selectedLanguageId: current.selectedLanguageId,
+  };
+  writeLocal(cleared);
+  return cleared;
 }
 
-export async function syncStorageWithCloud(
-  userId: string,
-  localData: UserStorageData
-): Promise<UserStorageData> {
-  if (!supabase) return localData;
+function mergeLessonProgress(
+  a: Record<string, LessonProgress>,
+  b: Record<string, LessonProgress>
+): Record<string, LessonProgress> {
+  const out: Record<string, LessonProgress> = { ...a };
+  for (const [key, lp] of Object.entries(b)) {
+    const existing = out[key];
+    out[key] = existing
+      ? {
+          ...lp,
+          bestWpm: Math.max(existing.bestWpm, lp.bestWpm),
+          bestAccuracy: Math.max(existing.bestAccuracy, lp.bestAccuracy),
+          completed: existing.completed || lp.completed,
+          attempts: Math.max(existing.attempts, lp.attempts),
+        }
+      : lp;
+  }
+  return out;
+}
+
+function mergeWeakKeys(
+  a: Record<string, Record<string, number>>,
+  b: Record<string, Record<string, number>>
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  const langs = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const lang of Array.from(langs)) {
+    const merged: Record<string, number> = { ...(a[lang] || {}) };
+    for (const [ch, count] of Object.entries(b[lang] || {})) {
+      merged[ch] = Math.max(merged[ch] || 0, count);
+    }
+    out[lang] = merged;
+  }
+  return out;
+}
+
+/**
+ * Called right after a user signs in.
+ * - Guest progress on this browser is moved into the user's account.
+ * - If this browser holds ANOTHER user's data, it is discarded (never mixed).
+ */
+export async function syncStorageWithCloud(userId: string): Promise<UserStorageData> {
+  let local = loadStorageData();
+
+  if (local.ownerUserId && local.ownerUserId !== userId) {
+    local = {
+      ...DEFAULT_DATA,
+      theme: local.theme,
+      uiLanguageId: local.uiLanguageId,
+      selectedLanguageId: local.selectedLanguageId,
+    };
+  }
+
+  if (!supabase) return local;
+
   try {
     const { data, error } = await supabase
       .from("user_progress")
@@ -68,47 +140,43 @@ export async function syncStorageWithCloud(
       .eq("user_id", userId)
       .maybeSingle();
 
+    let merged: UserStorageData = { ...local, ownerUserId: userId };
+
     if (!error && data?.payload) {
-      const cloudData = data.payload as UserStorageData;
-      // Merge results by unique id
-      const map = new Map<string, TestResult>();
-      for (const r of [...(cloudData.results || []), ...localData.results]) {
-        map.set(r.id, r);
-      }
-      const merged: UserStorageData = {
+      const cloud = { ...DEFAULT_DATA, ...(data.payload as Partial<UserStorageData>) };
+      const byId = new Map<string, TestResult>();
+      for (const r of [...(cloud.results || []), ...local.results]) byId.set(r.id, r);
+
+      merged = {
         ...DEFAULT_DATA,
-        ...cloudData,
-        ...localData,
-        results: Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp),
-        lessonProgress: {
-          ...(cloudData.lessonProgress || {}),
-          ...localData.lessonProgress,
-        },
-        weakKeys: {
-          ...(cloudData.weakKeys || {}),
-          ...localData.weakKeys,
-        },
+        ...cloud,
+        // Keep the choices made on this device
+        theme: local.theme,
+        uiLanguageId: local.uiLanguageId,
+        selectedLanguageId: local.selectedLanguageId,
+        dailyGoal: local.ownerUserId === userId ? local.dailyGoal : cloud.dailyGoal,
+        ownerUserId: userId,
+        results: Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp),
+        lessonProgress: mergeLessonProgress(cloud.lessonProgress || {}, local.lessonProgress),
+        weakKeys: mergeWeakKeys(cloud.weakKeys || {}, local.weakKeys),
       };
-      saveStorageData(merged);
-      await pushStorageToCloud(userId, merged);
-      return merged;
-    } else {
-      await pushStorageToCloud(userId, localData);
-      return localData;
     }
+
+    writeLocal(merged);
+    await pushStorageToCloud(userId, merged);
+    return merged;
   } catch (e) {
     console.error("Cloud sync error:", e);
-    return localData;
+    const fallback = { ...local, ownerUserId: userId };
+    writeLocal(fallback);
+    return fallback;
   }
 }
 
-export async function pushStorageToCloud(
-  userId: string,
-  data: UserStorageData
-): Promise<void> {
+export async function pushStorageToCloud(userId: string, data: UserStorageData): Promise<void> {
   if (!supabase) return;
   try {
-    await supabase.from("user_progress").upsert(
+    const { error } = await supabase.from("user_progress").upsert(
       {
         user_id: userId,
         payload: data,
@@ -116,10 +184,32 @@ export async function pushStorageToCloud(
       },
       { onConflict: "user_id" }
     );
+    if (error) console.error("Failed to push to cloud:", error.message);
   } catch (e) {
     console.error("Failed to push to cloud:", e);
   }
 }
+
+/** Permanently deletes the signed-in user's progress from the cloud (privacy). */
+export async function deleteCloudData(userId: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: "Cloud sync is not configured." };
+  const { error } = await supabase.from("user_progress").delete().eq("user_id", userId);
+  if (error) return { error: error.message };
+  return {};
+}
+
+// Wait 1.5s after the last change before uploading, so we don't upload on every keystroke.
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+function schedulePush(data: UserStorageData) {
+  if (!supabase || !data.ownerUserId) return;
+  const userId = data.ownerUserId;
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    pushStorageToCloud(userId, data);
+  }, 1500);
+}
+
+// ---------- Local (browser) storage ----------
 
 export function getLocalDateString(date: Date = new Date()): string {
   const year = date.getFullYear();
@@ -128,49 +218,48 @@ export function getLocalDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+function normalize(parsed: Partial<UserStorageData>): UserStorageData {
+  return {
+    ...DEFAULT_DATA,
+    ...parsed,
+    dailyGoal: parsed.dailyGoal ?? DEFAULT_DATA.dailyGoal,
+    results: Array.isArray(parsed.results) ? parsed.results : [],
+    lessonProgress: parsed.lessonProgress ?? {},
+    weakKeys: parsed.weakKeys ?? {},
+  };
+}
+
 export function loadStorageData(): UserStorageData {
-  if (typeof window === "undefined") {
-    return DEFAULT_DATA;
-  }
+  if (typeof window === "undefined") return DEFAULT_DATA;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_DATA;
-    const parsed = JSON.parse(raw) as Partial<UserStorageData>;
-    return {
-      ...DEFAULT_DATA,
-      ...parsed,
-      dailyGoal: parsed.dailyGoal ?? DEFAULT_DATA.dailyGoal,
-      results: Array.isArray(parsed.results) ? parsed.results : [],
-      lessonProgress: parsed.lessonProgress ?? {},
-      weakKeys: parsed.weakKeys ?? {},
-    };
+    return normalize(JSON.parse(raw) as Partial<UserStorageData>);
   } catch (e) {
     console.error("Failed to load storage data:", e);
     return DEFAULT_DATA;
   }
 }
 
-export function saveStorageData(data: UserStorageData): void {
+function writeLocal(data: UserStorageData): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    if (supabase) {
-      supabase.auth.getUser().then(({ data: authData }) => {
-        if (authData?.user?.id) {
-          pushStorageToCloud(authData.user.id, data);
-        }
-      });
-    }
   } catch (e) {
     console.error("Failed to save storage data:", e);
   }
+}
+
+export function saveStorageData(data: UserStorageData): void {
+  writeLocal(data);
+  schedulePush(data);
 }
 
 export function saveTestResult(result: TestResult): UserStorageData {
   const data = loadStorageData();
   const updatedResults = [...data.results, result];
 
-  // Update weakKeys for this language
+  // Add this test's mistakes to the weak-key counts for this language
   const langWeak = { ...(data.weakKeys[result.languageId] || {}) };
   for (const [char, count] of Object.entries(result.errorMap)) {
     if (char.trim().length > 0) {
@@ -178,18 +267,17 @@ export function saveTestResult(result: TestResult): UserStorageData {
     }
   }
 
-  // Update lesson progress if it was a lesson
+  // Update lesson progress (a lesson is completed with 90%+ accuracy)
   const updatedLessons = { ...data.lessonProgress };
   if (result.mode === "lesson" && result.lessonId) {
     const key = `${result.languageId}:${result.lessonId}`;
     const existing = updatedLessons[key];
-    const completed = (existing?.completed ?? false) || result.accuracy >= 90;
     updatedLessons[key] = {
       lessonId: result.lessonId,
       languageId: result.languageId,
       bestWpm: Math.max(existing?.bestWpm ?? 0, result.wpm),
       bestAccuracy: Math.max(existing?.bestAccuracy ?? 0, result.accuracy),
-      completed,
+      completed: (existing?.completed ?? false) || result.accuracy >= 90,
       attempts: (existing?.attempts ?? 0) + 1,
     };
   }
@@ -197,10 +285,7 @@ export function saveTestResult(result: TestResult): UserStorageData {
   const nextData: UserStorageData = {
     ...data,
     results: updatedResults,
-    weakKeys: {
-      ...data.weakKeys,
-      [result.languageId]: langWeak,
-    },
+    weakKeys: { ...data.weakKeys, [result.languageId]: langWeak },
     lessonProgress: updatedLessons,
   };
 
@@ -241,8 +326,9 @@ export function clearWeakKeysForLanguage(languageId: string): UserStorageData {
 }
 
 export function exportProgressJson(): string {
-  const data = loadStorageData();
-  return JSON.stringify(data, null, 2);
+  const { ownerUserId: _owner, ...rest } = loadStorageData();
+  void _owner;
+  return JSON.stringify(rest, null, 2);
 }
 
 export function importProgressJson(jsonString: string): {
@@ -253,25 +339,17 @@ export function importProgressJson(jsonString: string): {
   try {
     const parsed = JSON.parse(jsonString) as Partial<UserStorageData>;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.results)) {
-      return {
-        success: false,
-        error: "Invalid backup file format. Missing 'results' array.",
-      };
+      return { success: false, error: "This is not a valid backup file." };
     }
-    const merged: UserStorageData = {
-      ...DEFAULT_DATA,
-      ...parsed,
-      dailyGoal: parsed.dailyGoal ?? DEFAULT_DATA.dailyGoal,
-      results: parsed.results,
-      lessonProgress: parsed.lessonProgress ?? {},
-      weakKeys: parsed.weakKeys ?? {},
-    };
+    const current = loadStorageData();
+    // Imported data always belongs to whoever is using this browser right now
+    const merged: UserStorageData = { ...normalize(parsed), ownerUserId: current.ownerUserId };
     saveStorageData(merged);
     return { success: true, data: merged };
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to parse JSON file.",
+      error: err instanceof Error ? err.message : "Could not read this file.",
     };
   }
 }
@@ -295,48 +373,30 @@ export function calculateStreak(results: TestResult[]): {
 
   const practicedToday = dateSet.has(todayStr);
 
-  // Calculate current streak
+  // Current streak: counts back from today (or from yesterday if not practiced yet today)
   let currentStreak = 0;
-  let checkDate = new Date();
-  if (!practicedToday && dateSet.has(yesterdayStr)) {
-    checkDate = yesterday;
-  }
-
   if (practicedToday || dateSet.has(yesterdayStr)) {
-    while (true) {
-      const ds = getLocalDateString(checkDate);
-      if (dateSet.has(ds)) {
-        currentStreak++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        break;
-      }
+    const checkDate = practicedToday ? new Date() : yesterday;
+    while (dateSet.has(getLocalDateString(checkDate))) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
     }
   }
 
-  // Calculate longest streak
+  // Longest streak ever
   let longestStreak = 0;
   let tempStreak = 0;
   let prevDate: Date | null = null;
-
   for (const ds of uniqueDates) {
     const [y, m, d] = ds.split("-").map(Number);
     const curDate = new Date(y, m - 1, d);
     if (!prevDate) {
       tempStreak = 1;
     } else {
-      const diffDays = Math.round(
-        (curDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (diffDays === 1) {
-        tempStreak++;
-      } else {
-        tempStreak = 1;
-      }
+      const diffDays = Math.round((curDate.getTime() - prevDate.getTime()) / 86400000);
+      tempStreak = diffDays === 1 ? tempStreak + 1 : 1;
     }
-    if (tempStreak > longestStreak) {
-      longestStreak = tempStreak;
-    }
+    longestStreak = Math.max(longestStreak, tempStreak);
     prevDate = curDate;
   }
 

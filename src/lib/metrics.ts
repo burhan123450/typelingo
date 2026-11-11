@@ -4,12 +4,12 @@
 export function calculateWPM(correctChars: number, elapsedSeconds: number): number {
   if (elapsedSeconds <= 0 || correctChars <= 0) return 0;
   const minutes = elapsedSeconds / 60;
-  const wpm = correctChars / 5 / minutes;
-  return Math.round(wpm);
+  return Math.round(correctChars / 5 / minutes);
 }
 
 /**
  * Accuracy = correct characters / total typed characters * 100
+ * (every wrong key press counts as a typed character)
  */
 export function calculateAccuracy(correctChars: number, totalTypedChars: number): number {
   if (totalTypedChars <= 0) return 100;
@@ -18,17 +18,20 @@ export function calculateAccuracy(correctChars: number, totalTypedChars: number)
 }
 
 /**
- * Consistency score = how stable the speed stayed during the test (0 to 100%).
- * Computed from per-interval WPM samples using Coefficient of Variation (CV).
+ * Consistency score (0-100%) = how stable the speed stayed during the test.
+ *
+ * Input: the typing speed measured separately for each second of the test.
+ * We take the coefficient of variation (how much the speed jumps around
+ * compared to the average) and map it to 0-100 with a smooth curve,
+ * so steady typists score high and stop-start typing scores low.
  */
-export function calculateConsistency(wpmSamples: number[]): number {
-  if (wpmSamples.length < 2) return 100;
-  const mean = wpmSamples.reduce((sum, v) => sum + v, 0) / wpmSamples.length;
+export function calculateConsistency(perSecondWpm: number[]): number {
+  const samples = perSecondWpm.filter((v) => Number.isFinite(v));
+  if (samples.length < 3) return 100;
+  const mean = samples.reduce((s, v) => s + v, 0) / samples.length;
   if (mean <= 0) return 0;
-  const variance =
-    wpmSamples.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / wpmSamples.length;
-  const stdDev = Math.sqrt(variance);
-  const cv = stdDev / mean; // lower is more consistent
-  const score = Math.round((1 - Math.min(1, cv)) * 100);
-  return Math.max(0, Math.min(100, score));
+  const variance = samples.reduce((s, v) => s + (v - mean) ** 2, 0) / samples.length;
+  const cv = Math.sqrt(variance) / mean;
+  const score = 100 * (1 - Math.tanh(cv + cv ** 3 / 3 + cv ** 5 / 5));
+  return Math.max(0, Math.min(100, Math.round(score)));
 }

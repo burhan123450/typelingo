@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { LANGUAGES_LIST } from "@/lib/languages";
+import { SITE_NAME } from "@/lib/site";
 import {
   Keyboard,
   BookOpen,
@@ -49,22 +50,22 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Brand Logo & Tagline */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center text-base shadow-sm group-hover:bg-emerald-500 transition-colors">
-            TL
+          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-sm group-hover:bg-emerald-500 transition-colors">
+            BB
           </div>
           <div>
             <div className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white flex items-center gap-1">
-              <span>Type</span>
-              <span className="text-emerald-600 dark:text-emerald-400">Lingo</span>
+              <span>Big</span>
+              <span className="text-emerald-600 dark:text-emerald-400">Bird</span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block leading-none">
+            <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block leading-none">
               {t.tagline}
             </p>
           </div>
         </Link>
 
         {/* Main Navigation */}
-        <nav className="flex items-center gap-1 sm:gap-1.5">
+        <nav className="flex items-center gap-1 sm:gap-1.5" aria-label={SITE_NAME}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const active =
@@ -142,7 +143,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={toggleTheme}
-            aria-label="Toggle Dark/Light Mode"
+            aria-label={t.toggleTheme}
             className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
           >
             {isHydrated && storage.theme === "dark" ? (
@@ -162,7 +163,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={logout}
-                title="Sign out"
+                title={t.signOut}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
@@ -174,7 +175,7 @@ export default function Navbar() {
               onClick={loginWithGoogle}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 text-xs font-semibold shadow-sm transition-all"
             >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   fill="#4285F4"
                   d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
@@ -192,7 +193,7 @@ export default function Navbar() {
                   d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
                 />
               </svg>
-              <span>Sign in with Gmail</span>
+              <span>{t.signIn}</span>
             </button>
           )}
         </div>

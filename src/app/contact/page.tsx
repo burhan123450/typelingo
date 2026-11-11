@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Mail, MessageSquare, Globe } from "lucide-react";
+import { SITE_NAME, CONTACT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Contact Us",
-  description:
-    "Get in touch with the TypeLingo team for feedback, language requests, or support.",
+  description: `Get in touch with the ${SITE_NAME} team for feedback, language requests, or support.`,
 };
 
 export default function ContactPage() {
@@ -15,7 +15,7 @@ export default function ContactPage() {
       </h1>
       <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
         <p>
-          Have feedback, found a typo in one of our language packs, or want to request a new language (such as Hindi, Spanish, French, or Turkish)? We would love to hear from you!
+          Have feedback, found a typo in one of our language packs, or want to request a new language (such as Hindi, Spanish, French, or Turkish) on <strong>{SITE_NAME}</strong>? We would love to hear from you!
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
@@ -25,10 +25,10 @@ export default function ContactPage() {
               Email Support
             </div>
             <a
-              href="mailto:support@typelingo.com"
-              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline break-all"
             >
-              support@typelingo.com
+              {CONTACT_EMAIL}
             </a>
           </div>
 
@@ -38,7 +38,7 @@ export default function ContactPage() {
               Language Review
             </div>
             <p className="text-xs text-slate-500">
-              Native speakers can submit word/sentence improvements anytime.
+              Native speakers can submit word and sentence improvements anytime.
             </p>
           </div>
 
