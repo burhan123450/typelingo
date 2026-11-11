@@ -49,33 +49,24 @@ export default function LanguageSeoPage({ params }: LangPageProps) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-10">
-      <div className="text-center max-w-5xl mx-auto">
-        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider">
-          {lang.name} ({lang.nativeName}) · {lang.keyboardLayoutName}
-        </span>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1.5">
-          {lang.name} Typing Test & Touch Typing Practice
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 sm:whitespace-nowrap overflow-hidden text-ellipsis">
-          Improve your {lang.name} typing speed (WPM) and accuracy with our interactive on-screen keyboard, real-time metrics, and {lang.words.length}+ curated words and sentences.
-        </p>
+    <div className="max-w-6xl mx-auto px-4 flex flex-col gap-16">
+      {/* Full-Height Distraction-Free Practice Canvas First */}
+      <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-center">
+        <Suspense
+          fallback={
+            <div className="h-64 w-full max-w-3xl rounded-2xl bg-slate-100 dark:bg-slate-900 animate-pulse" />
+          }
+        >
+          <TypingBox forcedLanguage={lang} />
+        </Suspense>
       </div>
 
-      <Suspense
-        fallback={
-          <div className="h-64 rounded-2xl bg-slate-100 dark:bg-slate-900 animate-pulse" />
-        }
-      >
-        <TypingBox forcedLanguage={lang} />
-      </Suspense>
-
-      {/* Rich SEO Guide & FAQ Block */}
-      <article className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm text-sm leading-relaxed space-y-6">
+      {/* Rich SEO Guide & FAQ Block (Below the fold) */}
+      <article className="max-w-4xl mx-auto mb-12 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm text-sm leading-relaxed space-y-6">
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            How to Master {lang.name} ({lang.nativeName}) Touch Typing
-          </h2>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            {lang.name} Typing Test ({lang.nativeName}) — How to Master {lang.name} Touch Typing
+          </h1>
           <p className="text-slate-600 dark:text-slate-300">{lang.seo.intro}</p>
         </div>
 

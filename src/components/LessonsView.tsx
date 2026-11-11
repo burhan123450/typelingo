@@ -4,7 +4,7 @@ import React, { useState, Suspense } from "react";
 import { useApp } from "@/components/AppProvider";
 import { LANGUAGES_LIST } from "@/lib/languages";
 import TypingBox from "@/components/TypingBox";
-import { Lock, CheckCircle2, Play, ArrowLeft, Award } from "lucide-react";
+import { Lock, CheckCircle2, Play, Award } from "lucide-react";
 
 export default function LessonsView() {
   const { currentLanguage, setTypingLanguage, storage, isHydrated, t } = useApp();
@@ -30,34 +30,14 @@ export default function LessonsView() {
   };
 
   if (activeLessonId) {
-    const selectedLesson = orderedLessons.find((l) => l.id === activeLessonId);
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => setActiveLessonId(null)}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{t.backToLessons}</span>
-          </button>
-
-          {selectedLesson && (
-            <div className="text-sm font-bold text-slate-900 dark:text-white">
-              {selectedLesson.title} —{" "}
-              <span className="text-emerald-600 dark:text-emerald-400">
-                {t.needs90}
-              </span>
-            </div>
-          )}
-        </div>
-
+      <div className="max-w-5xl mx-auto px-4 min-h-[calc(100vh-120px)] flex flex-col items-center justify-center">
         <Suspense fallback={null}>
           <TypingBox
             forcedLanguage={currentLanguage}
             initialMode="lesson"
             lessonId={activeLessonId}
+            onBackFromLesson={() => setActiveLessonId(null)}
           />
         </Suspense>
       </div>
